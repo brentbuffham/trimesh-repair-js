@@ -1,0 +1,37 @@
+{
+	"name": "trimesh-repair-js",
+	"version": "0.0.0",
+	"description": "Repair functions for the trimesh family of JavaScript meshing libraries: open loops, patching, closing, welding, orientation and mesh checks. Placeholder release - the code arrives in 0.1.0.",
+	"type": "module",
+	"main": "src/index.js",
+	"exports": {
+		".": "./src/index.js"
+	},
+	"files": [
+		"src/",
+		"LICENSE",
+		"README.md"
+	],
+	"author": "Brent Buffham (https://kirra-design.com)",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/brentbuffham/trimesh-repair-js.git"
+	},
+	"bugs": {
+		"url": "https://github.com/brentbuffham/trimesh-repair-js/issues"
+	},
+	"homepage": "https://github.com/brentbuffham/trimesh-repair-js#readme",
+	"keywords": [
+		"mesh",
+		"mesh-repair",
+		"hole-filling",
+		"triangulation",
+		"manifold",
+		"trimesh",
+		"mining"
+	],
+	"engines": {
+		"node": ">=22"
+	}
+}
