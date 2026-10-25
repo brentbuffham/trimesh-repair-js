@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trimesh-repair-js — Three.js Demo</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #d0d0d0; overflow: hidden; }
+
+	/* ── Layout ── */
+	#app { display: flex; flex-direction: column; height: 100vh; }
+	#main-row { display: flex; flex: 1; overflow: hidden; }
+	#viewport { flex: 1; position: relative; }
+
+	/* ── Top toolbar ── */
+	#toolbar { padding: 4px 16px; background: #111; border-bottom: 1px solid #333; }
+	.toolbar-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
+	.toolbar-row .sep { width: 1px; height: 16px; background: #444; flex-shrink: 0; }
+	#toolbar h1 { font-size: 1rem; color: #cc2222; white-space: nowrap; }
+	#toolbar label { font-size: 0.8rem; color: #ddd; white-space: nowrap; }
+	#toolbar select, #toolbar button, #toolbar input[type=number] {
+		padding: 4px 8px; border: 1px solid #555; background: #333; color: #ddd;
+		border-radius: 3px; font-size: 0.8rem;
+	}
+	#toolbar input[type=number] { width: 64px; }
+	#toolbar button { cursor: pointer; }
+	#toolbar button:hover { background: #444; }
+	#toolbar button:disabled { opacity: 0.4; cursor: default; }
+	#toolbar button.primary { background: #cc2222; color: #fff; border-color: #cc2222; font-weight: 600; }
+	#toolbar button.primary:hover { background: #ee3333; }
+	#toolbar select:focus, #toolbar button:focus, #toolbar input:focus { outline: 1px solid #cc2222; }
+
+	/* ── Right info panel ── */
+	#info-panel {
+		width: 300px; min-width: 240px; background: #111; border-left: 1px solid #333;
+		padding: 10px 12px; font-size: 0.75rem; font-family: 'Courier New', monospace;
+		overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+	}
+	#info-panel h3 { color: #cc2222; font-size: 0.8rem; margin-bottom: 4px; }
+	#info-panel .stat { color: #999; line-height: 1.6; }
+	#info-panel .stat b { color: #d0d0d0; }
+	.legend { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+	.swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+	.good { color: #44cc66; font-weight: bold; }
+	.bad { color: #cc2222; font-weight: bold; }
+	#log div { color: #999; line-height: 1.5; }
+	#error { color: #ff6666; white-space: pre-wrap; }
+	@media (max-width: 720px) {
+		#main-row { flex-direction: column; }
+		#info-panel { width: auto; max-height: 40vh; border-left: none; border-top: 1px solid #333; }
+	}
+</style>
+</head>
+<body>
+<div id="app">
+	<div id="toolbar">
+		<div class="toolbar-row">
+			<h1>trimesh-repair-js <span id="lib-version" style="font-size:0.5em;color:#888">…</span></h1>
+			<span class="trimesh-family" style="font-size:0.75rem;color:#888;white-space:nowrap" title="The trimesh family of mesh libraries">family: <a href="https://brentbuffham.github.io/trimesh-boolean/" style="color:#cc2222" title="Boolean operations on open and closed triangle meshes - demo">trimesh-boolean</a> &middot; <a href="https://brentbuffham.github.io/trimesh-build-js/" style="color:#cc2222" title="Build meshes from point clouds (caves, drives, voids) - demo">trimesh-build-js</a> &middot; <b style="color:#ddd">trimesh-repair-js</b></span>
+			<span class="sep"></span>
+			<label>Mesh
+				<select id="source"></select>
+			</label>
+			<input type="file" id="file" accept=".obj" style="display:none">
+			<button id="openFile" title="Open a Wavefront OBJ (v and f lines; polygons are fanned to triangles)">Open OBJ…</button>
+			<button id="reset" title="Reload the mesh as it was made">Reset</button>
+			<span class="sep"></span>
+			<label><input type="checkbox" id="showWire"> wireframe</label>
+			<label><input type="checkbox" id="showLoops" checked> loops</label>
+			<label><input type="checkbox" id="showFolds" checked> folds</label>
+			<label><input type="checkbox" id="showAdded" checked> new triangles</label>
+			<label><input type="checkbox" id="showNormals"> normals</label>
+			<button id="exportObj">Export OBJ</button>
+		</div>
+		<div class="toolbar-row">
+			<select id="patchMethod" title="auto: fair, then fan, then centroid, then vertex fan. fair: Liepa fill, refined and faired into the surface. fan: no new points. centroid: one new point, fanned. vertex fan: fan from a loop vertex">
+				<option value="auto">auto</option>
+				<option value="fair">fair</option>
+				<option value="fan">fan</option>
+				<option value="centroid">centroid</option>
+				<option value="vertexFan">vertex fan</option>
+			</select>
+			<button id="patchSel" class="primary" title="Patch the selected loop (click near a red loop to select it; Enter also patches)">Patch selected</button>
+			<label title="Patch all only fills loops of at most this many edges, so a terrain's outer rim stays open">≤ <input type="number" id="patchMax" step="1" min="3" value="60"> edges</label>
+			<button id="patchAll" title="Patch every open loop of at most the edge limit (patchMeshLoopsLocal)">Patch all</button>
+			<span class="sep"></span>
+			<label title="fillGaps: patch loops of at most this many edges (thin slivers left by a build)">gaps ≤ <input type="number" id="gapMax" step="1" min="3" value="6"></label>
+			<button id="fillGaps" title="Fill small gaps (fillGaps), then re-orient">Fill gaps</button>
+			<button id="repairFolds" title="Cut a twisted strip at its folds: remove the triangles on edges both faces run the same way (repairFolds)">Repair folds</button>
+			<button id="orient" title="Make the winding agree across each part (orientMesh). Closed parts are wound inward: the cave convention">Orient</button>
+			<span class="sep"></span>
+			<button id="undo" title="Undo the last repair">Undo</button>
+		</div>
+	</div>
+	<div id="main-row">
+		<div id="viewport"></div>
+		<div id="info-panel">
+			<div>
+				<h3>Check</h3>
+				<div class="stat" id="report">…</div>
+				<div id="error"></div>
+			</div>
+			<div>
+				<h3>Legend</h3>
+				<div class="legend"><span class="swatch" style="background:#8fa8c8"></span>front face</div>
+				<div class="legend"><span class="swatch" style="background:#d08030"></span>back face</div>
+				<div class="legend"><span class="swatch" style="background:#ff3333"></span>open loop</div>
+				<div class="legend"><span class="swatch" style="background:#44ff44"></span>selected loop</div>
+				<div class="legend"><span class="swatch" style="background:#33ddff"></span>fold edge (both faces run it one way)</div>
+				<div class="legend"><span class="swatch" style="background:#ffdd00"></span>triangle the last repair added</div>
+			</div>
+			<div>
+				<h3>Log</h3>
+				<div id="log"></div>
+			</div>
+		</div>
+	</div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

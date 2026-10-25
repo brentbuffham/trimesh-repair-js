@@ -9,6 +9,8 @@ edges, enclosed volume).
 The functions were built and proven in [Kirra](https://kirra-design.com), then moved here.
 From 0.1.0 trimesh-build-js uses them from this library.
 
+**Live demo:** [brentbuffham.github.io/trimesh-repair-js](https://brentbuffham.github.io/trimesh-repair-js/). Load a mesh with problems (a sphere with holes, a terrain with an open rim, a cube missing its top, a sphere half inside out, a Möbius band) or open your own OBJ, then patch loops, fill gaps, repair folds and orient, and watch the check report change. The source is in `examples/`; run `npm run dev` to work on it locally.
+
 ## Install
 
 ```sh

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- A demo (`examples/`, live on GitHub Pages): meshes with problems, and the library's tools to fix them - Patch selected / Patch all (patchMeshLoopsLocal, every method), Fill gaps, Repair folds, Orient, Undo - with the checkMeshIndexed report after each step. Its header shows the library version and links to the trimesh family's other demos.
+- No library change.
+
 ## 0.1.1
 
 - The README: what the library does, the two levels, checking, patching (methods, `which`, winding), the BMS-level functions and the orientation convention. 0.1.0 shipped with the placeholder README.
