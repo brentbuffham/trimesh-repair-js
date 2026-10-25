@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- The README: what the library does, the two levels, checking, patching (methods, `which`, winding), the BMS-level functions and the orientation convention. 0.1.0 shipped with the placeholder README.
+
 ## 0.1.0
 
 First working release. The repair functions move here from trimesh-build-js 0.5.0, unchanged:

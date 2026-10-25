@@ -19,7 +19,7 @@
  * @module trimesh-repair-js
  */
 
-export var VERSION = "0.1.0";
+export var VERSION = "0.1.1";
 
 // ── BMS level ──
 export { edgesOf, markCurrent, poolEdgeKey } from "./bms/edges.js";
