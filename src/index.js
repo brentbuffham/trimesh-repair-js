@@ -34,3 +34,7 @@ export { repairFolds } from "./post/repairFolds.js";
 export { patchLoop, patchLoops, patchLoopIds } from "./post/patchLoop.js";
 export { triangulateHole, fairFill } from "./post/fairFill.js";
 export { toIndexed } from "./output/toIndexed.js";
+
+// ── Indexed level ({ positions, index } in and out) ──
+export { bmsFromIndexed, summaryOfResult, checkMesh, findOpenLoops, patchMeshLoops, fillOpenEdges, checkMeshIndexed, patchMeshLoopsLocal, soupOfIndexed, indexedOfSoup, DEFAULT_TOLERANCE } from "./indexed.js";
+export * from "./edgeKeys.js";
