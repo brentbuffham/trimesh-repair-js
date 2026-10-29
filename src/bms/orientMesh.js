@@ -25,7 +25,7 @@
 //=============================================================
 
 import { computeSignedVolume } from "trimesh-boolean";
-import { edgesOf, poolEdgeKey } from "./edges.js";
+import { edgesOf } from "./edges.js";
 
 function flip(t) {
 	var x = t.v1; t.v1 = t.v2; t.v2 = x;
@@ -109,6 +109,22 @@ function viewpointScore(soup, tris, viewpoints) {
 	return score;
 }
 
+// nbr[3t + k]: the triangle across the k-th edge of triangle t as the soup stands NOW
+// (edge k runs vertex k to vertex k+1), or -1 when the edge does not have exactly two faces.
+// Built once from the edge table; a flip swaps v1 and v2, which reads the three edges as
+// [2, 1, 0], so nothing has to be rebuilt as triangles turn over.
+function neighbourTable(soup, edges) {
+	var n = soup.length, nbr = new Int32Array(3 * n).fill(-1), counts = edges.counts, t0 = edges.t0, t1 = edges.t1;
+	for (var t = 0; t < n; t++) {
+		var tri = soup[t], a = tri.v0.id, b = tri.v1.id, c = tri.v2.id;
+		for (var e = 0; e < 3; e++) {
+			var s = edges.slot(e === 0 ? a : e === 1 ? b : c, e === 0 ? b : e === 1 ? c : a);
+			if (counts[s] === 2) nbr[3 * t + e] = t0[s] === t ? t1[s] : t0[s];
+		}
+	}
+	return nbr;
+}
+
 /**
  * @param {{soup: Array<Object>}} bms - triangles are flipped in place
  * @param {Array<number[]>} [viewpoints] - origin-shifted scanner positions
@@ -124,16 +140,18 @@ export function orientMesh(bms, viewpoints) {
 	var hasViews = Array.isArray(viewpoints) && viewpoints.length > 0;
 	var FN = unitNormals(soup);
 	var heap = new Heap(3 * soup.length);
+	var nbr = neighbourTable(soup, edges);
+	// ids of each triangle's v1 when the table was built: v1 changed means flipped
+	var v1At = new Int32Array(soup.length);
+	for (var i = 0; i < soup.length; i++) v1At[i] = soup[i].v1.id;
+	// the triangle across edge e of ti now (see neighbourTable)
+	function across(ti, e) { return nbr[3 * ti + (soup[ti].v1.id === v1At[ti] ? e : 2 - e)]; }
 
 	// Queue the 2-face neighbours of ti not yet reached, weighted by crease
 	function reach(ti) {
-		var t = soup[ti], vs = [t.v0.id, t.v1.id, t.v2.id];
 		for (var e = 0; e < 3; e++) {
-			var key = poolEdgeKey(vs[e], vs[(e + 1) % 3]);
-			if (edges.count(key) !== 2) continue;
-			var f0 = edges.tri(key, 0), f1 = edges.tri(key, 1);
-			var nj = f0 === ti ? f1 : f0;
-			if (comp[nj] !== -1) continue;
+			var nj = across(ti, e);
+			if (nj < 0 || comp[nj] !== -1) continue;
 			var d = FN[3 * ti] * FN[3 * nj] + FN[3 * ti + 1] * FN[3 * nj + 1] + FN[3 * ti + 2] * FN[3 * nj + 2];
 			heap.push(1 - Math.abs(d), nj, ti);
 		}
@@ -153,10 +171,8 @@ export function orientMesh(bms, viewpoints) {
 			// the edge the two share, in t's direction
 			var vs = [t.v0.id, t.v1.id, t.v2.id];
 			for (var e = 0; e < 3; e++) {
+				if (across(ti, e) !== nj) continue;
 				var a = vs[e], b = vs[(e + 1) % 3];
-				if (edges.count(poolEdgeKey(a, b)) !== 2) continue;
-				if (other.v0.id !== a && other.v1.id !== a && other.v2.id !== a) continue;
-				if (other.v0.id !== b && other.v1.id !== b && other.v2.id !== b) continue;
 				if (runs(other, a, b)) flip(other);
 				break;
 			}
@@ -170,10 +186,9 @@ export function orientMesh(bms, viewpoints) {
 		for (var q = 0; q < members.length; q++) {
 			var tq = soup[members[q]], ws = [tq.v0.id, tq.v1.id, tq.v2.id];
 			for (var k = 0; k < 3; k++) {
-				var p0 = ws[k], p1 = ws[(k + 1) % 3], key = poolEdgeKey(p0, p1);
-				if (edges.count(key) !== 2) { closed = false; continue; }
-				var g0 = edges.tri(key, 0), g1 = edges.tri(key, 1);
-				if (runs(soup[g0 === members[q] ? g1 : g0], p0, p1)) consistent = false;
+				var g = across(members[q], k);
+				if (g < 0) { closed = false; continue; }
+				if (runs(soup[g], ws[k], ws[(k + 1) % 3])) consistent = false;
 			}
 		}
 
