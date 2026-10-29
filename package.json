@@ -41,7 +41,7 @@
 		"build:demo": "vite build"
 	},
 	"dependencies": {
-		"trimesh-boolean": "^0.7.7"
+		"trimesh-boolean": "git+https://github.com/brentbuffham/trimesh-boolean.git#master"
 	},
 	"devDependencies": {
 		"trimesh-build-js": "git+https://github.com/brentbuffham/trimesh-build-js.git#main",

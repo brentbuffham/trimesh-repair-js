@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `trimesh-boolean` is installed from GitHub (`git+https://github.com/brentbuffham/trimesh-boolean.git#master`, 0.7.8: its vertex pool searches 8 cells, not 27, which speeds the weld). **Change it back to `^0.7.8` once trimesh-boolean 0.7.8 is on npm.**
 - The las-laz-js dev dependency is `git+https://github.com/brentbuffham/las-laz-js.git#main` (0.18.1, the faster `dedupe`), so one copy installs. **When las-laz-js 0.18.1 or later is on npm, change it back to `^0.18.1`**, with the trimesh-build-js one.
 
 ## 0.1.4
