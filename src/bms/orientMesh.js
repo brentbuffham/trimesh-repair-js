@@ -114,15 +114,26 @@ function viewpointScore(soup, tris, viewpoints) {
 // Built once from the edge table; a flip swaps v1 and v2, which reads the three edges as
 // [2, 1, 0], so nothing has to be rebuilt as triangles turn over.
 function neighbourTable(soup, edges) {
-	var n = soup.length, nbr = new Int32Array(3 * n).fill(-1), counts = edges.counts, t0 = edges.t0, t1 = edges.t1;
-	for (var t = 0; t < n; t++) {
-		var tri = soup[t], a = tri.v0.id, b = tri.v1.id, c = tri.v2.id;
-		for (var e = 0; e < 3; e++) {
-			var s = edges.slot(e === 0 ? a : e === 1 ? b : c, e === 0 ? b : e === 1 ? c : a);
-			if (counts[s] === 2) nbr[3 * t + e] = t0[s] === t ? t1[s] : t0[s];
-		}
+	var n = soup.length, nbr = new Int32Array(3 * n).fill(-1);
+	// the triangles' vertex ids once, sequentially, so the pass over the edges reads typed arrays only
+	var ids = new Int32Array(3 * n);
+	for (var t = 0; t < n; t++) { var tri = soup[t]; ids[3 * t] = tri.v0.id; ids[3 * t + 1] = tri.v1.id; ids[3 * t + 2] = tri.v2.id; }
+	var counts = edges.counts, t0 = edges.t0, t1 = edges.t1, va = edges.va, vb = edges.vb;
+	for (var s = 0; s < edges.size; s++) {
+		if (counts[s] !== 2) continue;
+		var f = t0[s], g = t1[s], a = va[s], b = vb[s];
+		nbr[3 * f + edgeIndex(ids, f, a, b)] = g;
+		nbr[3 * g + edgeIndex(ids, g, a, b)] = f;
 	}
 	return nbr;
+}
+
+// which edge of triangle t (edge k runs vertex k to k+1) joins vertex ids a and b, in either order
+function edgeIndex(ids, t, a, b) {
+	var p = ids[3 * t], q = ids[3 * t + 1], r = ids[3 * t + 2];
+	if ((p === a && q === b) || (p === b && q === a)) return 0;
+	if ((q === a && r === b) || (q === b && r === a)) return 1;
+	return 2;
 }
 
 /**

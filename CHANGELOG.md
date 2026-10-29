@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- **Faster weld and orientation set-up. Same results.** `ingestToBMS` looked each vertex up in an array indexed by scattered ids, which V8 holds in its slow sparse mode (2 s of a 4M-point weld); it now uses a typed-array index and builds `idToPool` once at the end. `orientMesh` builds each triangle's neighbours from one pass over the edge table's slots on typed arrays, not a hash lookup per triangle edge. A 260k-triangle cave orients in 0.17 s (0.45 s in 0.1.2); the winding, components and `perComponent` are identical to 0.1.2 on scrambled caves, and the weld matches a plain reference weld on a scatter with near-duplicate points, unused ids and break line seeds.
+
 ## 0.1.3
 
 - **Faster orientation and edge lookups. Same results.** `EdgeTable` was a `Map` keyed by one 52-bit double, so every lookup hashed a heap number; it is now an open-addressing hash table over the two vertex ids in typed arrays, with `slot(a, b)` and `addEdge(a, b, t)` beside the key methods. `orientMesh` looked an edge up about ten times per edge (reach, the walk, the consistency pass); it now reads each triangle's neighbours from one flat table built once. On a 260k-triangle cave `orientMesh` takes 0.21 s, was 0.43 s. The winding, components and `perComponent` are identical to 0.1.2 on a 20k sphere and three cave meshes with half the triangles flipped at random.
