@@ -41,11 +41,11 @@
 		"build:demo": "vite build"
 	},
 	"dependencies": {
-		"trimesh-boolean": "git+https://github.com/brentbuffham/trimesh-boolean.git#master"
+		"trimesh-boolean": "^0.7.9"
 	},
 	"devDependencies": {
-		"trimesh-build-js": "git+https://github.com/brentbuffham/trimesh-build-js.git#main",
-		"las-laz-js": "git+https://github.com/brentbuffham/las-laz-js.git#main",
+		"trimesh-build-js": "^0.6.7",
+		"las-laz-js": "^0.18.2",
 		"vitest": "^3.2.4",
 		"three": "^0.183.2",
 		"vite": "^7.3.7"

@@ -10,11 +10,7 @@
 - **The heap starts at 4096 entries and doubles** (it had room for 3 per triangle, 48 bytes a triangle: 140 MB on a 3M-triangle mesh).
 - **`EdgeTable` no longer stores a key per edge** (8 bytes an edge); `forEach` computes it from the two ids. It throws a `RangeError` naming tiling when a vertex id is 67,108,864 or more, instead of letting two edges share a key: `poolEdgeKey` packs both ids into one double, exact only below 2^26.
 - **`fairFill`: a `maxEdges` of 0 is used as given** (it was `o.maxEdges || 5000`).
-
-## Unreleased
-
-- `trimesh-boolean` is installed from GitHub (`git+https://github.com/brentbuffham/trimesh-boolean.git#master`, 0.7.8: its vertex pool searches 8 cells, not 27, which speeds the weld). **Change it back to `^0.7.8` once trimesh-boolean 0.7.8 is on npm.**
-- The las-laz-js dev dependency is `git+https://github.com/brentbuffham/las-laz-js.git#main` (0.18.1, the faster `dedupe`), so one copy installs. **When las-laz-js 0.18.1 or later is on npm, change it back to `^0.18.1`**, with the trimesh-build-js one.
+- Depends on trimesh-boolean `^0.7.9` (its vertex pool scans the 8 cells a tolerance ball touches, not 27: the weld on a 4M-point cloud 6.2 s to 4.1 s). Dev dependencies: trimesh-build-js `^0.6.7`, las-laz-js `^0.18.2` (a faster `dedupe`).
 
 ## 0.1.4
 
@@ -24,7 +20,7 @@
 
 - **Faster orientation and edge lookups. Same results.** `EdgeTable` was a `Map` keyed by one 52-bit double, so every lookup hashed a heap number; it is now an open-addressing hash table over the two vertex ids in typed arrays, with `slot(a, b)` and `addEdge(a, b, t)` beside the key methods. `orientMesh` looked an edge up about ten times per edge (reach, the walk, the consistency pass); it now reads each triangle's neighbours from one flat table built once. On a 260k-triangle cave `orientMesh` takes 0.21 s, was 0.43 s. The winding, components and `perComponent` are identical to 0.1.2 on a 20k sphere and three cave meshes with half the triangles flipped at random.
 - `edgesOf` rebuilds a cached table that came from another copy or version of the library, instead of calling methods it may not have.
-- The dev dependency on trimesh-build-js is now `git+https://github.com/brentbuffham/trimesh-build-js.git#main` (was `0.5.0`), and las-laz-js is `^0.18.0`, so one copy of each is installed. **Before this library goes to npm, once trimesh-build-js is published, change the git URL back to a version range.** (trimesh-build-js installs this library from GitHub the same way until then.)
+- The dev dependencies on trimesh-build-js and las-laz-js moved to current versions, so one copy of each is installed.
 
 ## 0.1.2
 
