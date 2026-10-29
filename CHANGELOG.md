@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The las-laz-js dev dependency is `git+https://github.com/brentbuffham/las-laz-js.git#main` (0.18.1, the faster `dedupe`), so one copy installs. **When las-laz-js 0.18.1 or later is on npm, change it back to `^0.18.1`**, with the trimesh-build-js one.
+
 ## 0.1.4
 
 - **Faster weld and orientation set-up. Same results.** `ingestToBMS` looked each vertex up in an array indexed by scattered ids, which V8 holds in its slow sparse mode (2 s of a 4M-point weld); it now uses a typed-array index and builds `idToPool` once at the end. `orientMesh` builds each triangle's neighbours from one pass over the edge table's slots on typed arrays, not a hash lookup per triangle edge. A 260k-triangle cave orients in 0.17 s (0.45 s in 0.1.2); the winding, components and `perComponent` are identical to 0.1.2 on scrambled caves, and the weld matches a plain reference weld on a scatter with near-duplicate points, unused ids and break line seeds.
