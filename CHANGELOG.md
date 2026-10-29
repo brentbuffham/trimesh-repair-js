@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- **`orientMesh` is about 4x faster standalone and leaner in memory. Same results.** It reads vertex ids from one typed array (kept in step with the flips) instead of through three objects per step, computes the face normals without an array per triangle, and its heap moves a held entry through a hole instead of swapping three arrays per level. The 260k-triangle Wookey Hole cave orients in 0.12 s (0.46 s in 0.1.2); winding, components and `perComponent` are identical to 0.1.2 on seven meshes, including a flat grid where every weight ties, and a test pops the new heap against the old one entry for entry on tie-heavy input.
+- **The heap starts at 4096 entries and doubles** (it had room for 3 per triangle, 48 bytes a triangle: 140 MB on a 3M-triangle mesh).
+- **`EdgeTable` no longer stores a key per edge** (8 bytes an edge); `forEach` computes it from the two ids. It throws a `RangeError` naming tiling when a vertex id is 67,108,864 or more, instead of letting two edges share a key: `poolEdgeKey` packs both ids into one double, exact only below 2^26.
+- **`fairFill`: a `maxEdges` of 0 is used as given** (it was `o.maxEdges || 5000`).
+
 ## Unreleased
 
 - `trimesh-boolean` is installed from GitHub (`git+https://github.com/brentbuffham/trimesh-boolean.git#master`, 0.7.8: its vertex pool searches 8 cells, not 27, which speeds the weld). **Change it back to `^0.7.8` once trimesh-boolean 0.7.8 is on npm.**

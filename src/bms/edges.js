@@ -39,7 +39,6 @@ export function poolEdgeKey(a, b) {
  */
 export function EdgeTable(capacity) {
 	var cap = Math.max(16, capacity || 0);
-	this.keys = new Float64Array(cap);
 	this.va = new Int32Array(cap);   // smaller vertex id
 	this.vb = new Int32Array(cap);   // larger vertex id
 	this.counts = new Uint32Array(cap);
@@ -72,9 +71,8 @@ function hashOf(a, b) {
 }
 
 EdgeTable.prototype._grow = function () {
-	var cap = this.keys.length * 2;
+	var cap = this.va.length * 2;
 	function bigger(Ctor, old) { var a = new Ctor(cap); a.set(old); return a; }
-	this.keys = bigger(Float64Array, this.keys);
 	this.va = bigger(Int32Array, this.va);
 	this.vb = bigger(Int32Array, this.vb);
 	this.counts = bigger(Uint32Array, this.counts);
@@ -98,6 +96,8 @@ EdgeTable.prototype.slot = function (a, b) {
 /** Add triangle t to edge (a, b). */
 EdgeTable.prototype.addEdge = function (a, b, t) {
 	var lo = a < b ? a : b, hi = a < b ? b : a;
+	// the key methods and poolEdgeKey pack both ids into one double, exact only below ID_SPAN
+	if (hi >= ID_SPAN) throw new RangeError("a mesh of " + (hi + 1).toLocaleString("en-US") + " or more vertices is too large for one edge table (limit " + ID_SPAN.toLocaleString("en-US") + "); mesh it in tiles");
 	var table = this._table, mask = this._mask, va = this.va, vb = this.vb;
 	var h = hashOf(lo, hi) & mask, s;
 	while ((s = table[h]) !== -1) {
@@ -112,7 +112,7 @@ EdgeTable.prototype.addEdge = function (a, b, t) {
 		}
 		h = (h + 1) & mask;
 	}
-	if (this.size === this.keys.length) {
+	if (this.size === this.va.length) {
 		this._grow();
 		this.addEdge(lo, hi, t);
 		return;
@@ -121,7 +121,6 @@ EdgeTable.prototype.addEdge = function (a, b, t) {
 	table[h] = s;
 	this.va[s] = lo;
 	this.vb[s] = hi;
-	this.keys[s] = lo * ID_SPAN + hi;
 	this.counts[s] = 1;
 	this.t0[s] = t;
 };
@@ -163,7 +162,7 @@ EdgeTable.prototype.tri = function (key, i) {
  * @param {function(number, number, number, number): void} fn - (count, key, t0, t1)
  */
 EdgeTable.prototype.forEach = function (fn) {
-	for (var s = 0; s < this.size; s++) fn(this.counts[s], this.keys[s], this.t0[s], this.t1[s]);
+	for (var s = 0; s < this.size; s++) fn(this.counts[s], this.va[s] * ID_SPAN + this.vb[s], this.t0[s], this.t1[s]);
 };
 
 /**

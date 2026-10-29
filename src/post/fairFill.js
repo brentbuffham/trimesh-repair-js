@@ -356,7 +356,7 @@ function fair(patch, ring, maxIter) {
 export function fairFill(P, opts) {
 	var o = opts || {};
 	var n = P.length / 3;
-	var maxEdges = o.maxEdges || 5000;
+	var maxEdges = o.maxEdges !== undefined ? o.maxEdges : 5000;
 	if (n > maxEdges) return { reason: "the loop has more than " + maxEdges + " edges" };
 	var patch = new Patch(P, n);
 	if (n <= EXACT_EDGES) {

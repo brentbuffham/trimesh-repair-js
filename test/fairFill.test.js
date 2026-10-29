@@ -138,3 +138,12 @@ describe("patchLoop method fair", function () {
 		}
 	});
 });
+
+describe("fairFill maxEdges", function () {
+	var square = new Float64Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+	it("a maxEdges of 0 refuses every loop, as given; unset allows 5000", function () {
+		expect(fairFill(square, { maxEdges: 0 }).reason).toMatch(/more than 0 edges/);
+		expect(fairFill(square, {}).reason).toBeUndefined();
+		expect(fairFill(square).reason).toBeUndefined();
+	});
+});

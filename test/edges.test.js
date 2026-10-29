@@ -74,3 +74,21 @@ describe("orientMesh on a flipped triangle", function () {
 		expect(runs12).toBe(1);
 	});
 });
+
+describe("EdgeTable limits", function () {
+	it("refuses vertex ids it cannot key, instead of aliasing edges", function () {
+		var t = new EdgeTable(4);
+		expect(function () { t.addEdge(5, 67108864, 0); }).toThrow(RangeError);
+		expect(function () { t.addEdge(67108864, 5, 0); }).toThrow(/tiles/);
+		t.addEdge(5, 67108863, 0);   // the largest id that fits
+		expect(t.count(poolEdgeKey(5, 67108863))).toBe(1);
+	});
+
+	it("forEach gives the key poolEdgeKey would, without storing one per edge", function () {
+		var t = new EdgeTable(4), got = [];
+		[[9, 2], [100, 7], [3, 3000000]].forEach(function (e, i) { t.addEdge(e[0], e[1], i); });
+		t.forEach(function (count, key) { got.push(key); });
+		expect(got).toEqual([poolEdgeKey(2, 9), poolEdgeKey(7, 100), poolEdgeKey(3, 3000000)]);
+		expect(t.keys).toBeUndefined();
+	});
+});

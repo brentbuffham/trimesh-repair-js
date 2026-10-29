@@ -1,6 +1,6 @@
 {
 	"name": "trimesh-repair-js",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "Repair functions for the trimesh family of JavaScript meshing libraries: find and patch open loops, fill gaps, close holes, repair folds, orient, and check a mesh (closed, non-manifold edges, enclosed volume).",
 	"type": "module",
 	"main": "./src/index.js",

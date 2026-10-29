@@ -27,13 +27,15 @@
 import { computeSignedVolume } from "trimesh-boolean";
 import { edgesOf } from "./edges.js";
 
-function flip(t) {
-	var x = t.v1; t.v1 = t.v2; t.v2 = x;
+// Turn triangle t over: swap v1 and v2, in the soup and in the ids array that mirrors it
+function flipAt(soup, ids, t) {
+	var tri = soup[t], x = tri.v1; tri.v1 = tri.v2; tri.v2 = x;
+	var o = 3 * t, y = ids[o + 1]; ids[o + 1] = ids[o + 2]; ids[o + 2] = y;
 }
 
 // true when triangle t runs edge a -> b
-function runs(t, a, b) {
-	var i0 = t.v0.id, i1 = t.v1.id, i2 = t.v2.id;
+function runs(ids, t, a, b) {
+	var o = 3 * t, i0 = ids[o], i1 = ids[o + 1], i2 = ids[o + 2];
 	return (i0 === a && i1 === b) || (i1 === a && i2 === b) || (i2 === a && i0 === b);
 }
 
@@ -43,52 +45,68 @@ function crossOf(t) {
 	return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
 }
 
-// Unit face normals, 3 per triangle (zero for a degenerate triangle)
+// Unit face normals, 3 per triangle (zero for a degenerate triangle). The same arithmetic as
+// crossOf, without an array per triangle.
 function unitNormals(soup) {
 	var N = new Float64Array(3 * soup.length);
 	for (var i = 0; i < soup.length; i++) {
-		var c = crossOf(soup[i]), l = Math.sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
-		if (l > 0) { N[3 * i] = c[0] / l; N[3 * i + 1] = c[1] / l; N[3 * i + 2] = c[2] / l; }
+		var t = soup[i], v0 = t.v0, v1 = t.v1, v2 = t.v2;
+		var ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
+		var bx = v2.x - v0.x, by = v2.y - v0.y, bz = v2.z - v0.z;
+		var c0 = ay * bz - az * by, c1 = az * bx - ax * bz, c2 = ax * by - ay * bx;
+		var l = Math.sqrt(c0 * c0 + c1 * c1 + c2 * c2);
+		if (l > 0) { N[3 * i] = c0 / l; N[3 * i + 1] = c1 / l; N[3 * i + 2] = c2 / l; }
 	}
 	return N;
 }
 
-// Binary min-heap of (weight, triangle, from) entries in typed arrays.
-// Each interior edge is pushed at most once from each side.
-function Heap(capacity) {
+// Binary min-heap of (weight, triangle, from) entries in typed arrays. Each interior edge is
+// pushed at most once from each side, but the walk's frontier is a small fraction of that, so
+// it starts small and doubles (16 bytes an entry; room for 3 per triangle up front was 48 bytes
+// a triangle, 140 MB on a 3M-triangle mesh).
+export function Heap(capacity) {
 	this.w = new Float64Array(Math.max(16, capacity));
 	this.to = new Int32Array(this.w.length);
 	this.from = new Int32Array(this.w.length);
 	this.size = 0;
 }
-Heap.prototype._swap = function (i, j) {
-	var w = this.w[i]; this.w[i] = this.w[j]; this.w[j] = w;
-	var t = this.to[i]; this.to[i] = this.to[j]; this.to[j] = t;
-	var f = this.from[i]; this.from[i] = this.from[j]; this.from[j] = f;
+// Push and pop move a held entry through a hole, one write per level, rather than swapping
+// three arrays per level. The comparisons are those of the swapping version, so the heap
+// ends in the same arrangement and entries come out in the same order.
+Heap.prototype._grow = function () {
+	var cap = this.w.length * 2;
+	function bigger(Ctor, old) { var a = new Ctor(cap); a.set(old); return a; }
+	this.w = bigger(Float64Array, this.w);
+	this.to = bigger(Int32Array, this.to);
+	this.from = bigger(Int32Array, this.from);
 };
 Heap.prototype.push = function (w, to, from) {
-	var i = this.size++;
-	this.w[i] = w; this.to[i] = to; this.from[i] = from;
+	if (this.size === this.w.length) this._grow();
+	var W = this.w, T = this.to, F = this.from, i = this.size++;
 	while (i > 0) {
 		var p = (i - 1) >> 1;
-		if (this.w[p] <= this.w[i]) break;
-		this._swap(p, i);
+		if (W[p] <= w) break;
+		W[i] = W[p]; T[i] = T[p]; F[i] = F[p];
 		i = p;
 	}
+	W[i] = w; T[i] = to; F[i] = from;
 };
 // Removes the lightest entry; read it from .w[size], .to[size], .from[size]
 Heap.prototype.pop = function () {
-	var last = --this.size;
-	this._swap(0, last);
+	var W = this.w, T = this.to, F = this.from, last = --this.size;
+	var rw = W[0], rt = T[0], rf = F[0];          // the entry leaving
+	var hw = W[last], ht = T[last], hf = F[last]; // the one that takes its place, then sifts down
 	var i = 0;
 	for (;;) {
-		var l = 2 * i + 1, r = l + 1, s = i;
-		if (l < last && this.w[l] < this.w[s]) s = l;
-		if (r < last && this.w[r] < this.w[s]) s = r;
-		if (s === i) break;
-		this._swap(s, i);
+		var l = 2 * i + 1, r = l + 1, s = -1, sw = hw;
+		if (l < last && W[l] < sw) { s = l; sw = W[l]; }
+		if (r < last && W[r] < sw) s = r;
+		if (s < 0) break;
+		W[i] = W[s]; T[i] = T[s]; F[i] = F[s];
 		i = s;
 	}
+	W[i] = hw; T[i] = ht; F[i] = hf;
+	W[last] = rw; T[last] = rt; F[last] = rf;
 };
 
 // Sum over triangles of (2 x area x normal) . (nearest viewpoint - centroid)
@@ -113,11 +131,8 @@ function viewpointScore(soup, tris, viewpoints) {
 // (edge k runs vertex k to vertex k+1), or -1 when the edge does not have exactly two faces.
 // Built once from the edge table; a flip swaps v1 and v2, which reads the three edges as
 // [2, 1, 0], so nothing has to be rebuilt as triangles turn over.
-function neighbourTable(soup, edges) {
-	var n = soup.length, nbr = new Int32Array(3 * n).fill(-1);
-	// the triangles' vertex ids once, sequentially, so the pass over the edges reads typed arrays only
-	var ids = new Int32Array(3 * n);
-	for (var t = 0; t < n; t++) { var tri = soup[t]; ids[3 * t] = tri.v0.id; ids[3 * t + 1] = tri.v1.id; ids[3 * t + 2] = tri.v2.id; }
+function neighbourTable(ids, n, edges) {
+	var nbr = new Int32Array(3 * n).fill(-1);
 	var counts = edges.counts, t0 = edges.t0, t1 = edges.t1, va = edges.va, vb = edges.vb;
 	for (var s = 0; s < edges.size; s++) {
 		if (counts[s] !== 2) continue;
@@ -144,19 +159,23 @@ function edgeIndex(ids, t, a, b) {
  *   componentOf maps each soup triangle to its index in perComponent
  */
 export function orientMesh(bms, viewpoints) {
-	var soup = bms.soup;
+	var soup = bms.soup, n = soup.length;
 	var edges = edgesOf(bms);
-	var comp = new Int32Array(soup.length).fill(-1);
+	var comp = new Int32Array(n).fill(-1);
 	var perComponent = [];
 	var hasViews = Array.isArray(viewpoints) && viewpoints.length > 0;
 	var FN = unitNormals(soup);
-	var heap = new Heap(3 * soup.length);
-	var nbr = neighbourTable(soup, edges);
-	// ids of each triangle's v1 when the table was built: v1 changed means flipped
-	var v1At = new Int32Array(soup.length);
-	for (var i = 0; i < soup.length; i++) v1At[i] = soup[i].v1.id;
-	// the triangle across edge e of ti now (see neighbourTable)
-	function across(ti, e) { return nbr[3 * ti + (soup[ti].v1.id === v1At[ti] ? e : 2 - e)]; }
+	var heap = new Heap(4096);
+	// every triangle's vertex ids, kept in step with the flips; v1At is v1 when the table was built
+	var ids = new Int32Array(3 * n), v1At = new Int32Array(n);
+	for (var i = 0; i < n; i++) {
+		var tr = soup[i];
+		ids[3 * i] = tr.v0.id; ids[3 * i + 1] = tr.v1.id; ids[3 * i + 2] = tr.v2.id;
+		v1At[i] = ids[3 * i + 1];
+	}
+	var nbr = neighbourTable(ids, n, edges);
+	// the triangle across edge e of ti now (see neighbourTable); v1 changed means flipped
+	function across(ti, e) { return nbr[3 * ti + (ids[3 * ti + 1] === v1At[ti] ? e : 2 - e)]; }
 
 	// Queue the 2-face neighbours of ti not yet reached, weighted by crease
 	function reach(ti) {
@@ -168,7 +187,7 @@ export function orientMesh(bms, viewpoints) {
 		}
 	}
 
-	for (var seed = 0; seed < soup.length; seed++) {
+	for (var seed = 0; seed < n; seed++) {
 		if (comp[seed] !== -1) continue;
 		var id = perComponent.length;
 		var members = [seed];
@@ -178,13 +197,11 @@ export function orientMesh(bms, viewpoints) {
 			heap.pop();
 			var nj = heap.to[heap.size], ti = heap.from[heap.size];
 			if (comp[nj] !== -1) continue;
-			var t = soup[ti], other = soup[nj];
-			// the edge the two share, in t's direction
-			var vs = [t.v0.id, t.v1.id, t.v2.id];
+			// the edge the two share, in ti's direction
 			for (var e = 0; e < 3; e++) {
 				if (across(ti, e) !== nj) continue;
-				var a = vs[e], b = vs[(e + 1) % 3];
-				if (runs(other, a, b)) flip(other);
+				var a = ids[3 * ti + e], b = ids[3 * ti + (e === 2 ? 0 : e + 1)];
+				if (runs(ids, nj, a, b)) flipAt(soup, ids, nj);
 				break;
 			}
 			comp[nj] = id;
@@ -195,21 +212,21 @@ export function orientMesh(bms, viewpoints) {
 		// closed: every edge has 2 faces; consistent: every one is run both ways
 		var consistent = true, closed = true;
 		for (var q = 0; q < members.length; q++) {
-			var tq = soup[members[q]], ws = [tq.v0.id, tq.v1.id, tq.v2.id];
+			var m = members[q];
 			for (var k = 0; k < 3; k++) {
-				var g = across(members[q], k);
+				var g = across(m, k);
 				if (g < 0) { closed = false; continue; }
-				if (runs(soup[g], ws[k], ws[(k + 1) % 3])) consistent = false;
+				if (runs(ids, g, ids[3 * m + k], ids[3 * m + (k === 2 ? 0 : k + 1)])) consistent = false;
 			}
 		}
 
 		var method;
 		if (hasViews) {
-			if (viewpointScore(soup, members, viewpoints) < 0) members.forEach(function (m) { flip(soup[m]); });
+			if (viewpointScore(soup, members, viewpoints) < 0) members.forEach(function (x) { flipAt(soup, ids, x); });
 			method = "viewpoint";
 		} else if (closed) {
-			var tris = members.map(function (m) { return soup[m]; });
-			if (computeSignedVolume(tris) > 0) members.forEach(function (m) { flip(soup[m]); });
+			var tris = members.map(function (x) { return soup[x]; });
+			if (computeSignedVolume(tris) > 0) members.forEach(function (x) { flipAt(soup, ids, x); });
 			method = "closed";
 		} else {
 			method = "unresolved";
