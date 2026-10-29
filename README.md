@@ -17,6 +17,8 @@ From 0.1.0 trimesh-build-js uses them from this library.
 npm i trimesh-repair-js
 ```
 
+Until the npm release, install it from GitHub: `npm i git+https://github.com/brentbuffham/trimesh-repair-js.git#main`. (trimesh-build-js does this too; once this library is on npm, that line in its `package.json` becomes a version range.)
+
 ES modules, Node 22 or later, or any modern browser. It depends on trimesh-boolean (its vertex pool,
 signed volume and loop triangulation). Nothing in it touches `window`, the DOM or Three.js, so it
 runs in a Web Worker.

@@ -4,6 +4,7 @@
 
 - **Faster orientation and edge lookups. Same results.** `EdgeTable` was a `Map` keyed by one 52-bit double, so every lookup hashed a heap number; it is now an open-addressing hash table over the two vertex ids in typed arrays, with `slot(a, b)` and `addEdge(a, b, t)` beside the key methods. `orientMesh` looked an edge up about ten times per edge (reach, the walk, the consistency pass); it now reads each triangle's neighbours from one flat table built once. On a 260k-triangle cave `orientMesh` takes 0.21 s, was 0.43 s. The winding, components and `perComponent` are identical to 0.1.2 on a 20k sphere and three cave meshes with half the triangles flipped at random.
 - `edgesOf` rebuilds a cached table that came from another copy or version of the library, instead of calling methods it may not have.
+- The dev dependency on trimesh-build-js is now `git+https://github.com/brentbuffham/trimesh-build-js.git#main` (was `0.5.0`), and las-laz-js is `^0.18.0`, so one copy of each is installed. **Before this library goes to npm, once trimesh-build-js is published, change the git URL back to a version range.** (trimesh-build-js installs this library from GitHub the same way until then.)
 
 ## 0.1.2
 
