@@ -18,14 +18,40 @@
 //      the void:
 //        viewpoints given -> face the nearest scanner position
 //        closed           -> void is inside, normals inward
-//                            (signed volume negative)
+//                            (signed volume negative), unless the
+//                            component is a thin sheet (see below)
 //        otherwise        -> leave it, "unresolved"; buildMesh then
 //                            runs orientByVisibility (visibility.js),
 //                            a ray vote for the void side.
+//   A closed component can be a sheet that patching sealed along its
+//   rim: a pancake whose two layers are a fraction of an edge apart.
+//   Its volume is a rounding error with a sign, and that sign would
+//   undo the vote that oriented the sheet. A closed component of
+//   minThinTriangles or more whose |volume| is under thinRatio x
+//   area x mean edge length is called "unresolved" so the vote
+//   decides. Real caves score 2-3 on this measure, a sphere 12,
+//   pancakes 0.05-0.4. Small solids keep the volume rule: a cube
+//   of 12 triangles scores 0.15 and is not noise.
 //=============================================================
 
 import { computeSignedVolume } from "trimesh-boolean";
 import { edgesOf } from "./edges.js";
+
+var THIN_RATIO = 0.5;
+var THIN_MIN_TRIANGLES = 100;
+
+// area x mean edge length of the triangles in `members`, the scale a volume is judged against
+function areaTimesEdge(soup, members) {
+	var area = 0, edges = 0;
+	for (var i = 0; i < members.length; i++) {
+		var t = soup[members[i]], a = t.v0, b = t.v1, c = t.v2;
+		var ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+		var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		area += 0.5 * Math.sqrt(nx * nx + ny * ny + nz * nz);
+		edges += Math.sqrt(ux * ux + uy * uy + uz * uz) + Math.sqrt(vx * vx + vy * vy + vz * vz) + Math.hypot(c.x - b.x, c.y - b.y, c.z - b.z);
+	}
+	return members.length ? area * edges / (3 * members.length) : 0;
+}
 
 // Turn triangle t over: swap v1 and v2, in the soup and in the ids array that mirrors it
 function flipAt(soup, ids, t) {
@@ -154,12 +180,17 @@ function edgeIndex(ids, t, a, b) {
 /**
  * @param {{soup: Array<Object>}} bms - triangles are flipped in place
  * @param {Array<number[]>} [viewpoints] - origin-shifted scanner positions
+ * @param {{thinRatio?: number, minThinTriangles?: number}} [options] - the thin closed sheet rule above:
+ *   thinRatio (default 0.5; 0 turns the rule off), minThinTriangles (default 100)
  * @returns {{perComponent: Array<{triangles: number, method: string, consistent: boolean}>,
  *   orientation: "viewpoint"|"closed"|"unresolved"|"mixed", componentOf: Int32Array}}
  *   componentOf maps each soup triangle to its index in perComponent
  */
-export function orientMesh(bms, viewpoints) {
+export function orientMesh(bms, viewpoints, options) {
 	var soup = bms.soup, n = soup.length;
+	var opts = options || {};
+	var thinRatio = opts.thinRatio !== undefined ? opts.thinRatio : THIN_RATIO;
+	var minThin = opts.minThinTriangles !== undefined ? opts.minThinTriangles : THIN_MIN_TRIANGLES;
 	var edges = edgesOf(bms);
 	var comp = new Int32Array(n).fill(-1);
 	var perComponent = [];
@@ -226,8 +257,13 @@ export function orientMesh(bms, viewpoints) {
 			method = "viewpoint";
 		} else if (closed) {
 			var tris = members.map(function (x) { return soup[x]; });
-			if (computeSignedVolume(tris) > 0) members.forEach(function (x) { flipAt(soup, ids, x); });
-			method = "closed";
+			var volume = computeSignedVolume(tris);
+			if (members.length >= minThin && Math.abs(volume) < thinRatio * areaTimesEdge(soup, members)) {
+				method = "unresolved";   // a sealed sheet: its volume says nothing, the vote will
+			} else {
+				if (volume > 0) members.forEach(function (x) { flipAt(soup, ids, x); });
+				method = "closed";
+			}
 		} else {
 			method = "unresolved";
 		}

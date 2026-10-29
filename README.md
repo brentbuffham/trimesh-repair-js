@@ -96,7 +96,7 @@ The same functions trimesh-build-js 0.5.0 had, with the same signatures:
 |---|---|
 | `ingestToBMS`, `cleanSoup` | Build and tidy a BMS result from triangles. |
 | `validateMesh`, `pointInside` | The mesh report (closed, boundary loops, non-manifold edges, enclosed volume); point-in-solid. |
-| `orientMesh`, `orientByVisibility` | Consistent winding per component, and its sign (viewpoints, a ray visibility vote, or signed volume). |
+| `orientMesh`, `orientByVisibility` | Consistent winding per component, and its sign (viewpoints, a ray visibility vote, or signed volume). A closed component of 100 or more triangles whose volume is under half of its area x mean edge length is a sealed sheet, not a solid: its volume is noise, so it is left "unresolved" for the vote (`orientMesh(bms, viewpoints, { thinRatio, minThinTriangles })`). |
 | `patchLoop(result, which, { method })`, `patchLoops(result, { maxEdges, method, loops })`, `patchLoopIds` | Patch one or many loops of a BMS result. |
 | `triangulateHole`, `fairFill` | The `fair` method's triangulation and fairing. |
 | `fillGaps`, `closeHoles` | Fill small loops automatically; close holes with centroid fans. |

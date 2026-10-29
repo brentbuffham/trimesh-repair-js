@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- **A thin closed sheet no longer has its winding set by a rounding-sized volume.** Patching the rim of an isolated sheet can close it into a pancake whose two layers are a fraction of an edge apart. `orientMesh` called any closed component "closed" and set its sign from the signed volume, so on Wookey Hole part 3 `patchLoops` reversed all 6,813 triangles of a sheet the visibility vote had oriented. A closed component of 100 triangles or more with |volume| under 0.5 x area x mean edge length is now "unresolved", and the vote decides (`orientMesh(bms, viewpoints, { thinRatio, minThinTriangles })`; `thinRatio: 0` turns it off). Measured on three caves: the 175k-triangle cave scores 2.7 and a sphere 12; every pancake scores 0.05 to 0.4, and none of the closed solids in the tests is touched. Small solids (a cube of 12 triangles scores 0.15) keep the volume rule because of the size floor.
+
 ## 0.1.5
 
 - **`orientMesh` is about 4x faster standalone and leaner in memory. Same results.** It reads vertex ids from one typed array (kept in step with the flips) instead of through three objects per step, computes the face normals without an array per triangle, and its heap moves a held entry through a hole instead of swapping three arrays per level. The 260k-triangle Wookey Hole cave orients in 0.12 s (0.46 s in 0.1.2); winding, components and `perComponent` are identical to 0.1.2 on seven meshes, including a flat grid where every weight ties, and a test pops the new heap against the old one entry for entry on tie-heavy input.
